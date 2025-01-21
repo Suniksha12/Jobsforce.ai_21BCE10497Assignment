@@ -1,8 +1,8 @@
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
-const { spawn } = require('child_process');
-const path = require('path');
+const pdfParse = require('pdf-parse');
+const fs = require('fs');
 
 const app = express();
 const upload = multer({ dest: 'uploads/' });
@@ -16,35 +16,23 @@ app.post('/api/extract', upload.single('pdf'), async (req, res) => {
     }
 
     try {
-        // Spawn Python process for PDF processing
-        const pythonProcess = spawn('python', [
-            'src/services/pdf_processor.py',
-            req.file.path
-        ]);
+        const dataBuffer = fs.readFileSync(req.file.path);
+        const data = await pdfParse(dataBuffer);
+        
+        // Basic extraction logic
+        const text = data.text;
+        const extractedData = {
+            name: extractName(text),
+            phone: extractPhone(text),
+            address: extractAddress(text)
+        };
 
-        let dataString = '';
-
-        pythonProcess.stdout.on('data', (data) => {
-            dataString += data.toString();
-        });
-
-        pythonProcess.stderr.on('data', (data) => {
-            console.error(`Error: ${data}`);
-        });
-
-        pythonProcess.on('close', (code) => {
-            if (code !== 0) {
-                return res.status(500).json({ error: 'PDF processing failed' });
-            }
-            try {
-                const extractedData = JSON.parse(dataString);
-                res.json(extractedData);
-            } catch (error) {
-                res.status(500).json({ error: 'Failed to parse extracted data' });
-            }
-        });
+        // Clean up uploaded file
+        fs.unlinkSync(req.file.path);
+        
+        res.json(extractedData);
     } catch (error) {
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ error: error.message });
     }
 });
 
