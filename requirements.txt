@@ -1,0 +1,4 @@
+npm init -y
+npm install express cors multer nodemon
+pip install pdfplumber spacy
+python -m spacy download en_core_web_sm
